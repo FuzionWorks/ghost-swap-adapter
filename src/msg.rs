@@ -15,10 +15,6 @@ pub enum ExecuteMsg {
     UpdateConfig {
         owner: Option<Addr>,
     },
-    PostSwap {
-        callback: Option<CallbackData>,
-        sender: Addr,
-    },
     /* Compatibility with FIN */
     Swap {
         /// Field provided for backward compatibility but ignored. Only a single
@@ -31,6 +27,11 @@ pub enum ExecuteMsg {
         /// The callback is executed on the sender's address.
         #[serde(skip_serializing_if = "Option::is_none")]
         callback: Option<CallbackData>,
+    },
+    /// Internal use -- returns the withdrawn funds to the sender
+    PostSwap {
+        callback: Option<CallbackData>,
+        sender: Addr,
     },
 }
 
