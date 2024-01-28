@@ -1,0 +1,1 @@
+ad0aad6f5cac4139a42df70cc5d786a2e4f6e8f6bc93f2b3a08c413f1eba1304  swap_adapter.wasm
