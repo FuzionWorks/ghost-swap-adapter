@@ -6,13 +6,13 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw_utils::one_coin;
-use kujira::{bow, ghost, KujiraMsg, KujiraQuery};
+use kujira::{ghost, KujiraMsg, KujiraQuery};
 
 use crate::msg::Config;
 use crate::state::CONFIG;
 use crate::{ContractError, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
-const CONTRACT_NAME: &str = "entropic/swap-adapter";
+const CONTRACT_NAME: &str = "fuzion/ghost-vault-swap-adapter";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
@@ -30,7 +30,10 @@ pub fn instantiate(
 ) -> Result<Response<KujiraMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config = Config { owner: msg.owner };
+    let config = Config {
+        owner: msg.owner,
+        vault_config: msg.vault_config,
+    };
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::default())
@@ -45,10 +48,16 @@ pub fn execute(
 ) -> Result<Response<KujiraMsg>, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     match msg {
-        ExecuteMsg::UpdateConfig { owner } => {
+        ExecuteMsg::UpdateConfig {
+            owner,
+            vault_config,
+        } => {
             ensure!(info.sender == config.owner, ContractError::Unauthorized {});
             if let Some(owner) = owner {
                 config.owner = owner;
+            }
+            if let Some(vault_config) = vault_config {
+                config.vault_config = vault_config;
             }
             CONFIG.save(deps.storage, &config)?;
             Ok(Response::default())
@@ -56,32 +65,42 @@ pub fn execute(
         ExecuteMsg::Swap { callback, .. } => {
             let received = one_coin(&info)?;
 
-            ensure!(
-                received.denom.starts_with("factory/"),
-                ContractError::InvalidDenom(received.denom)
-            );
+            let config = CONFIG.load(deps.storage)?;
 
-            let split = received.denom.split('/').collect::<Vec<&str>>();
-            ensure!(
-                split.len() == 3,
-                ContractError::InvalidDenom(received.denom)
-            );
-            let addr = split[1];
-            let subdenom = split[2];
-            let msg = match subdenom {
-                "ulp" => {
-                    let msg = bow::market_maker::ExecuteMsg::Withdraw { callback: None };
+            let denom_config = config
+                .vault_config
+                .iter()
+                .find(|x| x.denom.to_string() == received.denom);
+
+            let msg =
+                if let Some(denom_config) = denom_config {
+                    let msg = ghost::receipt_vault::ExecuteMsg::Deposit(
+                        ghost::receipt_vault::DepositMsg { callback: None },
+                    );
+                    let addr = &denom_config.address;
                     wasm_execute(addr, &msg, info.funds)?
-                }
-                "urcpt" => {
+                } else {
+                    ensure!(
+                        received.denom.starts_with("factory/"),
+                        ContractError::InvalidDenom(received.denom)
+                    );
+
+                    let split = received.denom.split('/').collect::<Vec<&str>>();
+                    ensure!(
+                        split.len() == 3,
+                        ContractError::InvalidDenom(received.denom)
+                    );
+                    ensure!(
+                        split[2] == "urcpt",
+                        ContractError::InvalidDenom(received.denom)
+                    );
+
                     let msg = ghost::receipt_vault::ExecuteMsg::Withdraw(
                         ghost::receipt_vault::WithdrawMsg { callback: None },
                     );
+                    let addr = split[1];
                     wasm_execute(addr, &msg, info.funds)?
-                }
-                _ => return Err(ContractError::InvalidDenom(received.denom)),
-            };
-
+                };
             let post_swap_msg = wasm_execute(
                 env.contract.address,
                 &ExecuteMsg::PostSwap {

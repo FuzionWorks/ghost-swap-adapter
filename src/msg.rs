@@ -1,10 +1,11 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Decimal256};
-use kujira::CallbackData;
+use kujira::{CallbackData, Denom};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Addr,
+    pub vault_config: Vec<VaultConfig>,
 }
 
 #[cw_serde]
@@ -14,6 +15,7 @@ pub struct MigrateMsg {}
 pub enum ExecuteMsg {
     UpdateConfig {
         owner: Option<Addr>,
+        vault_config: Option<Vec<VaultConfig>>,
     },
     /* Compatibility with FIN */
     Swap {
@@ -43,6 +45,13 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
+pub struct VaultConfig {
+    pub address: Addr,
+    pub denom: Denom,
+}
+
+#[cw_serde]
 pub struct Config {
     pub owner: Addr,
+    pub vault_config: Vec<VaultConfig>,
 }
