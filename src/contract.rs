@@ -12,7 +12,7 @@ use crate::msg::Config;
 use crate::state::CONFIG;
 use crate::{ContractError, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 
-const CONTRACT_NAME: &str = "fuzion/ghost-vault-swap-adapter";
+const CONTRACT_NAME: &str = "fuzion/ghost-vaults-swap-adapter";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
